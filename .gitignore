@@ -1,0 +1,63 @@
+# ---------------------------
+# Python関連
+# ---------------------------
+# バイトコードやキャッシュ
+__pycache__/
+*.py[cod]
+*$py.class
+
+# 仮想環境
+venv/
+env/
+ENV/
+.venv/
+.env/
+
+# pipのキャッシュ
+pip-log.txt
+pip-delete-this-directory.txt
+
+# テストやカバレッジ
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+pytest_cache/
+.pytest_cache/
+htmlcov/
+.tox/
+noxfile.py
+
+# 配布用ファイル
+build/
+dist/
+*.egg-info/
+*.egg
+*.whl
+*.manifest
+*.spec
+
+# IDEやエディタ関連
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# OS特有のファイル
+.DS_Store
+Thumbs.db
+
+# 個人設定ファイル
+*.env
+.env.*
+config.ini
+settings.ini
+
+# ログや一時ファイル
+*.log
+*.tmp
+*.bak
+
+# 出力ディレクトリ（必要に応じて追加）
+output_feature/
+
