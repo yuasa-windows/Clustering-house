@@ -40,13 +40,20 @@ def load_data(house_num, start_date, end_date, col_list):
 
     # 状態データの読み込み
     df_state = pd.DataFrame()
+    col_remove = []
     for column in col_list:
         try:
             file_path_list = glob.glob(f'../GMM-HMM_Trial/output_HMM/{house_num}号地/{column}/*_mode.csv')
         except FileNotFoundError:
             print(f'No mode file found for {column} in house {house_num}. Skipping.')
-            col_list.remove(column)
+            col_remove.append(column)
             continue
+
+        if not file_path_list:
+            print(f'No mode file found for {column} in house {house_num}.')
+            col_remove.append(column)
+            continue
+
         df_mode = pd.read_csv(file_path_list[-1], encoding='utf-8', index_col='time', parse_dates=['time'], usecols=['time', 'mode'])
         df_mode = df_mode.rename(columns={'mode': f'{column}_state'})
         if df_state.empty:
@@ -55,6 +62,9 @@ def load_data(house_num, start_date, end_date, col_list):
             df_state = pd.merge(df_state, df_mode, left_index=True, right_index=True)
 
     df_data = pd.merge(df_data, df_state, left_index=True, right_index=True)
+    for col in col_remove:
+        col_list.remove(col)
+        print(f'Removed {col} from analysis due to missing state data.')
     return df_data, col_list
 
 # 閾値の読み込み関数
@@ -126,14 +136,14 @@ def calc_consumption_per_active_hour(df_data, column):
 
 # --------------------------------------------------------------------------------------
 # メイン処理
-house_list = [156]
+house_list = [125]
 start_date = '2024-04-01 00:00:00'
-end_date = '2024-06-30 23:30:00'
-col_list = ['electric_demand', 'LD', 'kitchen', 'bedroom', 'washing_machine', 'dishwasher']
+end_date = '2025-03-30 23:30:00'
+col_list_origin = ['electric_demand', 'LD', 'kitchen', 'bedroom', 'washing_machine', 'dishwasher']
 
 for house_num in house_list:
     print(f"\n=== {house_num}号地 の分析 ===")
-    df_data, col_list = load_data(house_num, start_date, end_date, col_list)
+    df_data, col_list = load_data(house_num, start_date, end_date, col_list_origin)
     thresholds_csv = load_thresholds(house_num, col_list)
     for column in col_list:
         print(f"\t--- {column} の分析結果 ---")
