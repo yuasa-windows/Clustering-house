@@ -30,18 +30,18 @@ from column_translation import column_translation_dict
 
 # --------------------------------------------------------------------------------------
 # データ読み込み関数
-def load_data(house_num, start_date, end_date, col_list):
+def load_data(house_num, start_date, end_date, col_list_road):
     df = pd.read_csv(os.path.join(data_path_header, f'12_一括処理後データ/大林新星和不動産/{house_num}号地/{house_num}_30Min.csv'), encoding='utf-8')
     df = df.rename(columns=column_translation_dict)
     df["time"] = pd.to_datetime(df["time"])
     df = df[(df["time"] >= start_date) & (df["time"] <= end_date)]
-    df_data = df[['time'] + col_list]
+    df_data = df[['time'] + col_list_road]
     df_data.set_index('time', inplace=True)
 
     # 状態データの読み込み
     df_state = pd.DataFrame()
     col_remove = []
-    for column in col_list:
+    for column in col_list_road:
         try:
             file_path_list = glob.glob(f'../GMM-HMM_Trial/output_HMM/{house_num}号地/{column}/*_mode.csv')
         except FileNotFoundError:
@@ -63,13 +63,17 @@ def load_data(house_num, start_date, end_date, col_list):
 
     df_data = pd.merge(df_data, df_state, left_index=True, right_index=True)
     for col in col_remove:
-        col_list.remove(col)
+        col_list_road.remove(col)
         print(f'Removed {col} from analysis due to missing state data.')
-    return df_data, col_list
+    return df_data, col_list_road
 
 # 閾値の読み込み関数
 def load_thresholds(house_num, col_list):
-    file_path_list = glob.glob(f'../GMM-HMM_Trial/output_HMM/{house_num}号地/{col_list[0]}/*_result.csv')
+    try:
+        file_path_list = glob.glob(f'../GMM-HMM_Trial/output_HMM/{house_num}号地/{col_list[0]}/*_result.csv')
+    except FileNotFoundError:
+        print(f'No result file found for {col_list[0]} in house {house_num}.')
+        return None
     thresholds_csv = pd.read_csv(file_path_list[-1], encoding='utf-8')
     return thresholds_csv
 
@@ -82,18 +86,11 @@ def calc_mean_consumption(df_data, column):
 
 # 2. 時刻別消費量（0-6, 6-12, 12-18, 18-24）
 def calc_time_bin_consumption(df_data, column):
-    def time_bin(hour):
-        if 0 <= hour < 6:
-            return '0-6'
-        elif 6 <= hour < 12:
-            return '6-12'
-        elif 12 <= hour < 18:
-            return '12-18'
-        else:
-            return '18-24'
-    df_data['time_bin'] = df_data.index.hour.map(time_bin)
-    time_bin_monthly = df_data.groupby([df_data.index.to_period('M'), 'time_bin'])[column].mean().unstack()
-    return time_bin_monthly.round(2)
+    # 3時間区間に分類
+    df_data['hour_bin'] = (df_data.index.hour // 6) * 6
+    monthly_time_bin = df_data.groupby([df_data.index.to_period('M'), 'hour_bin'])[column].mean().unstack(level=1)
+    monthly_time_bin.columns = [f'{h}-{h+6}' for h in monthly_time_bin.columns]
+    return monthly_time_bin.round(2)
 
 # 3. PCR（ピーク消費比率）
 def calc_pcr(df_data, column):
@@ -125,26 +122,37 @@ def calc_weekday_weekend_ratio(df_data, column):
     monthly_sum['weekday_weekend_ratio'] = monthly_sum['weekday'] / monthly_sum['weekend']
     return monthly_sum['weekday_weekend_ratio'].round(2)
 
-# --- 6. 稼働時間に対する消費量 ---
+# --- 6. 稼働時間に対する消費量 + 時刻別稼働確率 ---
 def calc_consumption_per_active_hour(df_data, column):
+    # 稼働判定
     df_data['is_active'] = df_data[f'{column}_state'] >= 2
     monthly_active_hours = df_data.groupby(df_data.index.to_period('M'))['is_active'].sum() * 0.5
     active_df = df_data[df_data['is_active']].copy()
     monthly_active_consumption = active_df.groupby(active_df.index.to_period('M'))[column].sum()
     monthly_ratio = monthly_active_consumption / monthly_active_hours
-    return monthly_active_hours, monthly_ratio.round(2)
+    # --- 月別・3時間区間稼働確率 ---
+    df_data['month'] = df_data.index.to_period('M')
+    df_data['hour_bin'] = (df_data.index.hour // 3) * 3
+    grouped = df_data.groupby(['month', 'hour_bin'])
+    active_counts = grouped['is_active'].sum()
+    total_counts = grouped['is_active'].count()
+    hourly_active_probability = (active_counts / total_counts).unstack(level=1).round(2)
+    hourly_active_probability.columns = [f'{h}-{h+3}' for h in hourly_active_probability.columns]
+
+    return monthly_active_hours, monthly_ratio.round(2), hourly_active_probability
 
 # --------------------------------------------------------------------------------------
 # メイン処理
-house_list = [125]
+house_list = [80, 81, 82, 83, 115, 117, 118, 120, 121, 124, 125, 126, 127, 147, 148, 150, 152, 155, 156, 157]
 start_date = '2024-04-01 00:00:00'
 end_date = '2025-03-30 23:30:00'
-col_list_origin = ['electric_demand', 'LD', 'kitchen', 'bedroom', 'washing_machine', 'dishwasher']
+col_list_origin = ['electric_demand', 'LD', 'kitchen', 'bedroom', 'bathroom', 'washing_machine', 'dishwasher']
 
 for house_num in house_list:
     print(f"\n=== {house_num}号地 の分析 ===")
-    df_data, col_list = load_data(house_num, start_date, end_date, col_list_origin)
-    thresholds_csv = load_thresholds(house_num, col_list)
+    df_data, col_list = load_data(house_num, start_date, end_date, col_list_origin.copy())
+    # thresholds_csv = load_thresholds(house_num, col_list)
+    print(f"分析対象の列: {col_list}")
     for column in col_list:
         print(f"\t--- {column} の分析結果 ---")
         total_annual, total_monthly = calc_mean_consumption(df_data, column)
@@ -152,7 +160,7 @@ for house_num in house_list:
         pcr_monthly = calc_pcr(df_data, column)
         day_night_ratio = calc_day_night_ratio(df_data, column)
         weekday_weekend_ratio = calc_weekday_weekend_ratio(df_data, column)
-        active_hours, consumption_per_active_hour = calc_consumption_per_active_hour(df_data, column)
+        active_hours, consumption_per_active_hour, hourly_active_probability = calc_consumption_per_active_hour(df_data, column)
 
         # --- 結果表示 ---
         print("\t1. 平均消費量（年間）:", total_annual)
