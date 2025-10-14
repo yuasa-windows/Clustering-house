@@ -3,6 +3,7 @@
 import os
 import sys
 import glob
+from pathlib import Path
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -292,7 +293,14 @@ def build_monthly_metrics_df(
 
 # --------------------------------------------------------------------------------------
 # メイン処理
-house_list = [80, 81, 82, 83, 115, 117, 118, 120, 121, 124, 125, 126, 127, 147, 148, 150, 152, 155, 156, 157]
+target_dir = Path('../GMM-HMM_Trial/output_HMM')
+dirs = [
+    p.name.removesuffix('号地')
+    for p in target_dir.iterdir()
+    if p.is_dir() and p.name.endswith('号地')
+]
+house_list = sorted(dirs, key=lambda x: int(x))
+# house_list = [83, 124]
 start_date = '2024-04-01 00:00:00'
 end_date = '2025-03-30 23:30:00'
 col_list_origin = ['electric_demand', 'LD', 'kitchen', 'bedroom', 'bathroom', 'washing_machine', 'dishwasher']
