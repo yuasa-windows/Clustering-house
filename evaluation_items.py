@@ -311,7 +311,7 @@ for house_num in house_list:
     # thresholds_csv = load_thresholds(house_num, col_list)
     print(f"分析対象の列: {col_list}")
     for column in col_list:
-        print(f"\t--- {column} の分析結果 ---")
+        # print(f"\t--- {column} の分析結果 ---")
 
         # ここで出力したい指標だけ選ぶ
         selected_metrics = [
