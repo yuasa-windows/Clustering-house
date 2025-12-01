@@ -248,11 +248,13 @@ def main():
     df_monthly = df_wide[df_wide["agg"] == "monthly"].copy()
     df_weekly = df_wide[df_wide["agg"] == "weekly"].copy()
 
-    out_monthly = base_dir / "combined_monthly_features.csv"
-    out_weekly = base_dir / "combined_weekly_features.csv"
+    output_dir_list = [Path("./output_feature"), Path("../Dicision_Tree/data/raw")]
+    for output_dir in output_dir_list:
+        out_monthly = output_dir / "combined_monthly_features.csv"
+        out_weekly = output_dir / "combined_weekly_features.csv"
 
-    df_monthly.to_csv(out_monthly, index=False)
-    df_weekly.to_csv(out_weekly, index=False)
+        df_monthly.to_csv(out_monthly, index=False)
+        df_weekly.to_csv(out_weekly, index=False)
 
     print("\n=== 出力結果 ===")
     print("月次データの形状:", df_monthly.shape, "->", out_monthly)
