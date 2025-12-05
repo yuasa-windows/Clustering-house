@@ -59,8 +59,8 @@ settings.ini
 *.bak
 
 # 出力ディレクトリ（必要に応じて追加）
-output_feature/
-output_feature_ver1/
+output/
 other/
 
-
+# 入力データ（必要に応じて追加）
+data_features/
